@@ -1,0 +1,6 @@
+{
+  "name": "PlayRewards",
+  "description": "Mobile reward gaming app with internal mini-games, centralized coin ledger, and redemption system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

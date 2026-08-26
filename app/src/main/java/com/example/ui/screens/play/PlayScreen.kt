@@ -51,6 +51,7 @@ import com.example.ui.theme.AppSpacing
 @Composable
 fun PlayScreen(
     viewModel: PlayViewModel,
+    onNavigateToGame: (String) -> Unit = {},
     snackbarHostState: SnackbarHostState,
     modifier: Modifier = Modifier
 ) {
@@ -163,7 +164,17 @@ fun PlayScreen(
                 AppGameCard(
                     game = game,
                     playsRemaining = playsRemaining,
-                    onPlayClick = { viewModel.openGamePreview(game) }
+                    onPlayClick = {
+                        when (game.gameId) {
+                            "spin_win" -> onNavigateToGame("spin")
+                            "scratch_card", "scratch_reveal" -> onNavigateToGame("scratch")
+                            "puzzle", "puzzles" -> onNavigateToGame("puzzle")
+                            "coin_toss" -> onNavigateToGame("coin_toss")
+                            "tictactoe" -> onNavigateToGame("tictactoe")
+                            "bubble_pop" -> onNavigateToGame("bubble_pop")
+                            else -> viewModel.openGamePreview(game)
+                        }
+                    }
                 )
             }
         }

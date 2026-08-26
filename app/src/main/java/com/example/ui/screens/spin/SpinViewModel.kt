@@ -3,15 +3,21 @@ package com.example.ui.screens.spin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.data.model.GamePlayStats
+import com.example.core.config.SpinGameConfig
+import com.example.core.config.SpinRewardSegment
+import com.example.data.model.CoinTransaction
 import com.example.data.model.TransactionType
-import com.example.data.repository.GameRepository
 import com.example.data.repository.UserRepository
-import com.example.domain.engine.RewardEngine
+import com.example.data.repository.WalletRepository
+import com.example.domain.engine.DailySpinStats
 import com.example.domain.engine.RewardGrantResult
+import com.example.domain.engine.SpinGameEngine
+import com.example.domain.engine.SpinResult
 import com.example.services.ads.AdActionConfig
+import com.example.services.ads.AdEligibilityResult
 import com.example.services.ads.AdMobService
 import com.example.services.ads.AdPlacement
+import com.example.services.ads.AdRewardType
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,126 +25,264 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import java.util.UUID
-import kotlin.random.Random
 
 data class SpinUiState(
     val isSpinning: Boolean = false,
     val targetRotation: Float = 0f,
-    val selectedSectorIndex: Int = 0,
-    val lastRewardResult: RewardGrantResult? = null,
-    val availableSpinsRemaining: Int = 10,
-    val toastMessage: String? = null
+    val dailyStats: DailySpinStats = DailySpinStats(
+        dailyLimit = SpinGameConfig.dailySpinLimit,
+        spinsUsedToday = 0,
+        spinsRemainingToday = SpinGameConfig.dailySpinLimit,
+        resetDate = ""
+    ),
+    val winningResult: SpinResult.Success? = null,
+    val showWinDialog: Boolean = false,
+    val isAdLoading: Boolean = false,
+    val adRewardDialog: RewardGrantResult.Success? = null,
+    val toastMessage: String? = null,
+    val errorMessage: String? = null
 )
 
 class SpinViewModel(
-    private val rewardEngine: RewardEngine,
-    private val gameRepository: GameRepository,
-    private val adMobService: AdMobService,
-    private val userRepository: UserRepository
+    private val spinGameEngine: SpinGameEngine,
+    private val walletRepository: WalletRepository,
+    private val userRepository: UserRepository,
+    private val adMobService: AdMobService
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SpinUiState())
     val uiState: StateFlow<SpinUiState> = _uiState.asStateFlow()
 
-    val wheelSectors = listOf(25L, 50L, 75L, 100L, 150L, 200L, 350L, 700L)
+    val segments: List<SpinRewardSegment> = SpinGameConfig.getActiveSegments()
 
-    val todayStats: StateFlow<List<GamePlayStats>> = userRepository.observeCurrentUser().flatMapLatest { user ->
-        if (user != null) gameRepository.observeTodayStats(user.userId) else flowOf(emptyList())
+    // Live balance from immutable ledger
+    val coinBalance: StateFlow<Long> = userRepository.observeCurrentUser().flatMapLatest { user ->
+        if (user != null) walletRepository.observeCalculatedBalance(user.userId) else flowOf(0L)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = 0L
+    )
+
+    // Spin history strictly from central ledger (filtered for SPIN_REWARD)
+    val spinHistory: StateFlow<List<CoinTransaction>> = userRepository.observeCurrentUser().flatMapLatest { user ->
+        if (user != null) {
+            walletRepository.observeTransactions(user.userId).map { txList ->
+                txList.filter { it.type == TransactionType.SPIN_REWARD }
+            }
+        } else {
+            flowOf(emptyList())
+        }
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
-    fun performSpin(isRewardedAdBonus: Boolean = false) {
+    init {
+        refreshDailyStats()
+    }
+
+    fun refreshDailyStats() {
+        viewModelScope.launch {
+            val user = userRepository.getCurrentUser() ?: return@launch
+            val stats = spinGameEngine.getDailySpinStats(user.userId)
+            _uiState.value = _uiState.value.copy(dailyStats = stats)
+        }
+    }
+
+    fun performSpin() {
         if (_uiState.value.isSpinning) return
 
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSpinning = true, lastRewardResult = null)
+        val stats = _uiState.value.dailyStats
+        if (stats.spinsRemainingToday <= 0) {
+            _uiState.value = _uiState.value.copy(
+                toastMessage = "No spins remaining today. Watch a video ad for bonus coins!"
+            )
+            return
+        }
 
-            val winningIndex = Random.nextInt(wheelSectors.size)
-            val sectorCoins = wheelSectors[winningIndex]
-            val extraRounds = 5 * 360f
-            val sectorAngle = 360f / wheelSectors.size
-            val targetAngle = extraRounds + (winningIndex * sectorAngle) + (sectorAngle / 2f)
+        viewModelScope.launch {
+            val user = userRepository.getCurrentUser()
+            if (user == null) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Please log in to play.")
+                return@launch
+            }
 
             _uiState.value = _uiState.value.copy(
-                targetRotation = targetAngle,
-                selectedSectorIndex = winningIndex
+                isSpinning = true,
+                errorMessage = null,
+                showWinDialog = false,
+                winningResult = null
             )
 
-            delay(3000)
+            // Authoritative server/engine-side result generation & wallet credit
+            val result = spinGameEngine.executeAuthoritativeSpin(user.userId)
 
-            val user = userRepository.getCurrentUser()
-            if (user != null) {
-                val sessionToken = UUID.randomUUID().toString()
-                val grantResult = rewardEngine.processGameReward(
-                    userId = user.userId,
-                    gameId = "spin_win",
-                    calculatedScore = sectorCoins.toInt(),
-                    rawCoinsProposed = sectorCoins,
-                    multiplier = if (isRewardedAdBonus) 2.0 else 1.0,
-                    sessionId = sessionToken
-                )
+            when (result) {
+                is SpinResult.Success -> {
+                    val winningIndex = result.segmentIndex
+                    val segmentCount = segments.size
+                    val sectorAngle = 360f / segmentCount
+                    val sectorCenterAngle = (winningIndex * sectorAngle) + (sectorAngle / 2f)
 
-                _uiState.value = _uiState.value.copy(
-                    isSpinning = false,
-                    lastRewardResult = grantResult,
-                    toastMessage = when (grantResult) {
-                        is RewardGrantResult.Success -> grantResult.message
-                        is RewardGrantResult.AlreadyClaimed -> grantResult.message
-                        is RewardGrantResult.Rejected -> grantResult.reason
-                    }
-                )
-            } else {
-                _uiState.value = _uiState.value.copy(isSpinning = false)
+                    // Calculate rotation to align winning segment center with top pointer (270°)
+                    val currentRot = _uiState.value.targetRotation
+                    val currentModulo = ((currentRot % 360f) + 360f) % 360f
+                    val deltaAngle = ((270f - sectorCenterAngle - currentModulo) % 360f + 360f) % 360f
+                    val fullRounds = 6 * 360f
+                    val targetRot = currentRot + fullRounds + deltaAngle
+
+                    _uiState.value = _uiState.value.copy(
+                        targetRotation = targetRot,
+                        dailyStats = _uiState.value.dailyStats.copy(
+                            spinsUsedToday = result.spinsUsedToday,
+                            spinsRemainingToday = result.spinsRemainingToday
+                        ),
+                        winningResult = result
+                    )
+
+                    // Wait for the wheel deceleration animation to finish (3.5 seconds)
+                    delay(3600)
+
+                    _uiState.value = _uiState.value.copy(
+                        isSpinning = false,
+                        showWinDialog = true
+                    )
+                }
+
+                is SpinResult.LimitReached -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSpinning = false,
+                        dailyStats = _uiState.value.dailyStats.copy(
+                            spinsUsedToday = result.spinsUsedToday,
+                            spinsRemainingToday = (result.limit - result.spinsUsedToday).coerceAtLeast(0)
+                        ),
+                        toastMessage = result.message
+                    )
+                }
+
+                is SpinResult.GameDisabled -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSpinning = false,
+                        errorMessage = result.message
+                    )
+                }
+
+                is SpinResult.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isSpinning = false,
+                        errorMessage = result.message
+                    )
+                }
             }
         }
     }
 
-    fun watchRewardedAdForExtraSpin() {
+    fun dismissWinDialog() {
+        _uiState.value = _uiState.value.copy(showWinDialog = false)
+        refreshDailyStats()
+    }
+
+    fun onExtraAdSpinClick() {
+        if (_uiState.value.isAdLoading) return
+
         viewModelScope.launch {
-            val user = userRepository.getCurrentUser() ?: return@launch
-            val config = AdActionConfig(
-                actionKey = "EXTRA_SPIN_${System.currentTimeMillis()}",
-                rewardType = TransactionType.AD_REWARD,
-                rewardAmount = 50L,
-                source = "rewarded_ad_spin_bonus",
-                cooldownSeconds = 30L,
-                dailyLimit = 5,
-                title = "Extra Spin Bonus"
+            val user = userRepository.getCurrentUser()
+            if (user == null) {
+                _uiState.value = _uiState.value.copy(errorMessage = "Please log in to claim video rewards.")
+                return@launch
+            }
+
+            val actionConfig = AdActionConfig(
+                rewardType = AdRewardType.AD_EXTRA_SPIN,
+                source = "spin_screen",
+                rewardAmount = 25L,
+                title = "Watch Video for +25 NestCoins"
             )
+
+            val eligibility = adMobService.checkRewardedAdEligibility(user.userId, actionConfig)
+            when (eligibility) {
+                is AdEligibilityResult.CooldownActive -> {
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = "Video ad cooldown: ${eligibility.remainingSeconds}s remaining."
+                    )
+                    return@launch
+                }
+                is AdEligibilityResult.DailyLimitReached -> {
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = "Daily limit of ${eligibility.maxLimit} video rewards reached for today."
+                    )
+                    return@launch
+                }
+                is AdEligibilityResult.Disabled -> {
+                    _uiState.value = _uiState.value.copy(toastMessage = eligibility.message)
+                    return@launch
+                }
+                is AdEligibilityResult.NotReady -> {
+                    _uiState.value = _uiState.value.copy(toastMessage = eligibility.message)
+                    return@launch
+                }
+                is AdEligibilityResult.Eligible -> {
+                    // Start ad flow
+                }
+            }
+
+            _uiState.value = _uiState.value.copy(isAdLoading = true)
 
             adMobService.showRewardedAd(
                 userId = user.userId,
                 placement = AdPlacement.REWARDED_SPIN_EXTRA,
-                actionConfig = config,
-                onRewardGranted = {
-                    performSpin(isRewardedAdBonus = true)
+                actionConfig = actionConfig,
+                onRewardGranted = { grantResult ->
+                    _uiState.value = _uiState.value.copy(isAdLoading = false)
+                    when (grantResult) {
+                        is RewardGrantResult.Success -> {
+                            _uiState.value = _uiState.value.copy(adRewardDialog = grantResult)
+                        }
+                        is RewardGrantResult.AlreadyClaimed -> {
+                            _uiState.value = _uiState.value.copy(toastMessage = grantResult.message)
+                        }
+                        is RewardGrantResult.Rejected -> {
+                            _uiState.value = _uiState.value.copy(errorMessage = grantResult.reason)
+                        }
+                    }
                 },
-                onAdFailedOrSkipped = { error ->
-                    _uiState.value = _uiState.value.copy(toastMessage = error)
+                onAdFailedOrSkipped = { failureReason ->
+                    _uiState.value = _uiState.value.copy(
+                        isAdLoading = false,
+                        toastMessage = failureReason
+                    )
                 }
             )
         }
+    }
+
+    fun dismissAdRewardDialog() {
+        _uiState.value = _uiState.value.copy(adRewardDialog = null)
+        refreshDailyStats()
     }
 
     fun clearToast() {
         _uiState.value = _uiState.value.copy(toastMessage = null)
     }
 
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
     class Factory(
-        private val rewardEngine: RewardEngine,
-        private val gameRepository: GameRepository,
-        private val adMobService: AdMobService,
-        private val userRepository: UserRepository
+        private val spinGameEngine: SpinGameEngine,
+        private val walletRepository: WalletRepository,
+        private val userRepository: UserRepository,
+        private val adMobService: AdMobService
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return SpinViewModel(rewardEngine, gameRepository, adMobService, userRepository) as T
+            return SpinViewModel(spinGameEngine, walletRepository, userRepository, adMobService) as T
         }
     }
 }

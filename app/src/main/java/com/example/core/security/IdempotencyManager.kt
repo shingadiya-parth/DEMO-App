@@ -10,9 +10,14 @@ object IdempotencyManager {
 
     /**
      * Generates a unique transaction token for a specific game/activity action.
+     * When sessionId is provided, returns a deterministic idempotency key.
      */
     fun generateToken(userId: String, source: String, sessionId: String? = null): String {
-        val raw = "$userId:$source:${sessionId ?: UUID.randomUUID()}:${System.currentTimeMillis()}"
+        val raw = if (sessionId != null) {
+            "$userId:$source:$sessionId"
+        } else {
+            "$userId:$source:${UUID.randomUUID()}:${System.currentTimeMillis()}"
+        }
         return sha256(raw)
     }
 

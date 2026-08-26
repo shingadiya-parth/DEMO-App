@@ -64,6 +64,8 @@ import androidx.compose.ui.unit.sp
 import com.example.core.config.DailyBonusConfig
 import com.example.data.model.GameDefinition
 import com.example.domain.engine.CoinConversionHelper
+import com.example.services.ads.AdPlacement
+import com.example.ui.components.AdBannerContainer
 import com.example.ui.components.AppCard
 import com.example.ui.components.AppHeroCard
 import com.example.ui.components.AppProgressBar
@@ -174,15 +176,25 @@ fun HomeScreen(
                     HomeQuickGameCard(
                         game = game,
                         onPlayClick = {
-                            if (game.gameId == "spin_win") {
-                                onNavigateTo(Screen.Spin.route)
-                            } else {
-                                onNavigateTo(Screen.Play.route)
+                            when (game.gameId) {
+                                "spin_win" -> onNavigateTo(Screen.Spin.route)
+                                "scratch_card", "scratch_reveal" -> onNavigateTo(Screen.Scratch.route)
+                                "puzzle", "puzzles" -> onNavigateTo(Screen.Puzzle.route)
+                                "coin_toss" -> onNavigateTo(Screen.CoinToss.route)
+                                "tictactoe" -> onNavigateTo(Screen.TicTacToe.route)
+                                "bubble_pop" -> onNavigateTo(Screen.BubblePop.route)
+                                else -> onNavigateTo(Screen.Play.route)
                             }
                         }
                     )
                 }
             }
+        }
+
+        // Ad Banner Slot
+        item {
+            Spacer(modifier = Modifier.height(AppSpacing.sm))
+            AdBannerContainer(placement = AdPlacement.BANNER_HOME)
         }
 
         // 6. EARN MORE SECTION (Only In-App Activities: Daily Bonus, Refer & Earn, Giveaways)
@@ -220,12 +232,12 @@ fun HomeScreen(
 
                 EarnActivityBanner(
                     title = "Refer & Earn",
-                    subtitle = "Share invite code to earn +350 Coins per friend",
-                    rewardBadge = "+350 Coins",
+                    subtitle = "Share invite code to earn +500 Coins per friend",
+                    rewardBadge = "+500 Coins",
                     icon = Icons.Filled.Group,
                     color = AppColors.Primary,
                     bgColor = AppColors.PrimaryLight,
-                    onClick = { onNavigateTo(Screen.Earn.route) }
+                    onClick = { onNavigateTo(Screen.ReferEarn.route) }
                 )
 
                 EarnActivityBanner(

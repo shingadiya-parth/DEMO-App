@@ -75,6 +75,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel,
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState,
+    onNavigateToRefer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -353,18 +354,26 @@ fun ProfileScreen(
                         }
                     }
 
-                    IconButton(
-                        onClick = {
-                            val code = user?.referralCode ?: ""
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText("Referral Code", code))
-                        },
-                        modifier = Modifier.testTag("copy_referral_code_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.ContentCopy,
-                            contentDescription = "Copy code",
-                            tint = AppColors.Primary
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = {
+                                val code = user?.referralCode ?: ""
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                clipboard.setPrimaryClip(ClipData.newPlainText("Referral Code", code))
+                            },
+                            modifier = Modifier.testTag("copy_referral_code_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.ContentCopy,
+                                contentDescription = "Copy code",
+                                tint = AppColors.Primary
+                            )
+                        }
+
+                        AppOutlineButton(
+                            text = "Dashboard",
+                            onClick = onNavigateToRefer,
+                            modifier = Modifier.testTag("profile_refer_dashboard_btn")
                         )
                     }
                 }

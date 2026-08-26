@@ -173,14 +173,19 @@ fun AppRewardCard(
     reward: RedemptionReward,
     userBalance: Long,
     onRedeemClick: () -> Unit,
+    onCardClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val canAfford = userBalance >= reward.requiredCoins
     val progress = CoinConversionHelper.calculateProgressTowards(userBalance, reward.requiredCoins)
+    val remainingCoins = (reward.requiredCoins - userBalance).coerceAtLeast(0L)
+    val isStockAvailable = reward.stockStatus == com.example.data.model.RewardStockStatus.AVAILABLE ||
+            reward.stockStatus == com.example.data.model.RewardStockStatus.LOW_STOCK
 
     AppCard(
         modifier = modifier
             .fillMaxWidth()
+            .clickable(enabled = onCardClick != null) { onCardClick?.invoke() }
             .testTag("reward_card_${reward.rewardId}"),
         shape = RoundedCornerShape(AppRadius.card),
         elevation = AppElevation.card,
@@ -192,22 +197,48 @@ fun AppRewardCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IllustrationPlaceholder(gameId = "reward_${reward.partnerBrand.lowercase()}", size = 44.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    IllustrationPlaceholder(gameId = "reward_${reward.partnerBrand.lowercase().replace(" ", "_")}", size = 44.dp)
                     Spacer(modifier = Modifier.width(AppSpacing.md))
                     Column {
-                        Text(
-                            text = reward.rewardName,
-                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp),
-                            color = AppColors.TextNavy
-                        )
-                        Text(
-                            text = reward.partnerBrand,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = AppColors.TextSecondary
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = reward.rewardName,
+                                style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold),
+                                color = AppColors.TextNavy
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = reward.partnerBrand,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = AppColors.TextSecondary
+                            )
+                            if (reward.stockStatus == com.example.data.model.RewardStockStatus.LOW_STOCK) {
+                                Spacer(modifier = Modifier.width(AppSpacing.xs))
+                                Surface(
+                                    shape = RoundedCornerShape(AppRadius.small),
+                                    color = AppColors.ActionOrangeLight
+                                ) {
+                                    Text(
+                                        text = reward.stockStatus.badgeText,
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = AppColors.ActionOrangeDark
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
+
+                Spacer(modifier = Modifier.width(AppSpacing.sm))
 
                 Surface(
                     shape = RoundedCornerShape(AppRadius.small),
@@ -229,18 +260,20 @@ fun AppRewardCard(
             Text(
                 text = reward.description,
                 style = MaterialTheme.typography.bodySmall,
-                color = AppColors.TextSecondary
+                color = AppColors.TextSecondary,
+                maxLines = 2
             )
 
             Spacer(modifier = Modifier.height(AppSpacing.md))
 
+            // Progress bar and remaining coins display
             AppProgressBar(
                 progress = progress,
                 progressColor = if (canAfford) AppColors.SuccessGreen else AppColors.Primary,
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(AppSpacing.sm))
+            Spacer(modifier = Modifier.height(AppSpacing.xs))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -248,12 +281,46 @@ fun AppRewardCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "${CoinConversionHelper.formatCoins(reward.requiredCoins)} Coins Required",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                    text = if (canAfford) {
+                        "${CoinConversionHelper.formatCoins(reward.requiredCoins)} / ${CoinConversionHelper.formatCoins(reward.requiredCoins)} coins"
+                    } else {
+                        "${CoinConversionHelper.formatCoins(userBalance)} / ${CoinConversionHelper.formatCoins(reward.requiredCoins)} coins"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
                     color = AppColors.TextSecondary
                 )
 
-                if (canAfford) {
+                Text(
+                    text = if (canAfford) "Goal Reached!" else "${CoinConversionHelper.formatCoins(remainingCoins)} coins remaining",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        fontWeight = if (canAfford) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    color = if (canAfford) AppColors.SuccessGreenDark else AppColors.TextMuted
+                )
+            }
+
+            Spacer(modifier = Modifier.height(AppSpacing.md))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "${CoinConversionHelper.formatCoins(reward.requiredCoins)} NestCoins",
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                    color = AppColors.TextNavy
+                )
+
+                if (!isStockAvailable) {
+                    AppSmallActionButton(
+                        text = "Out of Stock",
+                        onClick = {},
+                        enabled = false,
+                        icon = Icons.Filled.Lock,
+                        modifier = Modifier.testTag("redeem_btn_outofstock_${reward.rewardId}")
+                    )
+                } else if (canAfford) {
                     AppSmallActionButton(
                         text = "Redeem",
                         onClick = onRedeemClick,
@@ -262,10 +329,12 @@ fun AppRewardCard(
                     )
                 } else {
                     AppSmallActionButton(
-                        text = "Locked",
-                        onClick = {},
-                        enabled = false,
+                        text = "Need ${CoinConversionHelper.formatCoins(remainingCoins)}",
+                        onClick = { onCardClick?.invoke() },
+                        enabled = true,
                         icon = Icons.Filled.Lock,
+                        backgroundColor = AppColors.PrimaryLight,
+                        contentColor = AppColors.PrimaryDark,
                         modifier = Modifier.testTag("redeem_btn_locked_${reward.rewardId}")
                     )
                 }

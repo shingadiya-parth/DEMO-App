@@ -24,6 +24,9 @@ object AppSpacing {
 }
 
 object AppRadius {
+    val sm: Dp = 8.dp
+    val md: Dp = 14.dp
+    val lg: Dp = 20.dp
     val small: Dp = 8.dp       // Small tags, chips, sub-elements
     val button: Dp = 14.dp      // Standard buttons
     val pill: Dp = 999.dp       // Capsule/Pill buttons & chips

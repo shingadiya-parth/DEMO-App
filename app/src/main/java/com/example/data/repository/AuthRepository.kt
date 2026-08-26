@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import androidx.room.withTransaction
+import com.example.core.config.ReferralConfig
 import com.example.core.database.AppDatabase
 import com.example.core.security.AuthCryptoHelper
 import com.example.data.local.AuthDao
@@ -10,6 +11,9 @@ import com.example.data.local.RedemptionDao
 import com.example.data.local.UserDao
 import com.example.data.model.AccountStatus
 import com.example.data.model.AuthCredentials
+import com.example.data.model.ReferralRecord
+import com.example.data.model.ReferralRiskState
+import com.example.data.model.ReferralStatus
 import com.example.data.model.UserAccount
 import com.example.data.model.Wallet
 import com.example.data.model.WalletStatus
@@ -139,11 +143,13 @@ class AuthRepository(
 
         // Check referral code if provided
         var referrerUserId: String? = null
+        var referringUserAccount: UserAccount? = null
         if (!referralCode.isNullOrBlank()) {
             val cleanCode = referralCode.trim().uppercase()
             val referringUser = userDao.getUserByReferralCode(cleanCode)
             if (referringUser != null) {
                 referrerUserId = referringUser.userId
+                referringUserAccount = referringUser
             }
         }
 
@@ -189,10 +195,30 @@ class AuthRepository(
             walletStatus = WalletStatus.ACTIVE
         )
 
+        val referralRecord = if (referringUserAccount != null) {
+            ReferralRecord(
+                referralId = "ref_${UUID.randomUUID().toString().take(12)}",
+                referrerUserId = referringUserAccount.userId,
+                referredUserId = userId,
+                referralCode = referringUserAccount.referralCode,
+                createdAt = System.currentTimeMillis(),
+                status = ReferralStatus.PENDING,
+                qualificationProgress = 0,
+                qualificationTarget = ReferralConfig.requiredGameSessionsCount,
+                referrerRewardAmount = ReferralConfig.referrerReward,
+                referredUserRewardAmount = ReferralConfig.referredUserReward,
+                idempotencyKey = "ref_bind_${referringUserAccount.userId}_$userId",
+                riskState = ReferralRiskState.NORMAL
+            )
+        } else null
+
         database.withTransaction {
             authDao.insertCredentials(credentials)
             userDao.insertUser(newUser)
             database.walletDao().insertWallet(newWallet)
+            if (referralRecord != null) {
+                database.referralDao().insertReferral(referralRecord)
+            }
         }
 
         sessionManager.setActiveUserId(userId)

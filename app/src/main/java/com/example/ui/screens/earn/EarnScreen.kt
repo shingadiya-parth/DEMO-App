@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.core.config.ReferralConfig
 import com.example.services.ads.AdPlacement
 import com.example.ui.components.AdBannerContainer
 import com.example.ui.components.AppCard
@@ -60,6 +61,7 @@ import com.example.ui.theme.AppSpacing
 fun EarnScreen(
     viewModel: EarnViewModel,
     snackbarHostState: SnackbarHostState,
+    onNavigateToRefer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -245,7 +247,7 @@ fun EarnScreen(
                             color = AppColors.GoldCoinLight
                         ) {
                             Text(
-                                text = "+350 Coins Each",
+                                text = "+${ReferralConfig.referrerReward} Coins",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     color = AppColors.GoldCoinDark,
                                     fontWeight = FontWeight.Bold
@@ -257,33 +259,11 @@ fun EarnScreen(
 
                     Spacer(modifier = Modifier.height(AppSpacing.md))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(AppSpacing.sm)
-                    ) {
-                        OutlinedTextField(
-                            value = referralInput,
-                            onValueChange = { referralInput = it },
-                            placeholder = { Text("Enter a Friend's Code", fontSize = 13.sp) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(AppRadius.small),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = AppColors.Primary,
-                                unfocusedBorderColor = AppColors.SurfaceBorder
-                            ),
-                            modifier = Modifier.weight(1f).testTag("referral_input_field")
-                        )
-
-                        AppSmallActionButton(
-                            text = "Apply",
-                            onClick = {
-                                viewModel.applyReferral(referralInput)
-                                referralInput = ""
-                            },
-                            modifier = Modifier.testTag("apply_referral_btn")
-                        )
-                    }
+                    AppPrimaryButton(
+                        text = "Open Refer & Earn Dashboard",
+                        onClick = onNavigateToRefer,
+                        modifier = Modifier.fillMaxWidth().testTag("open_refer_earn_btn")
+                    )
                 }
             }
         }

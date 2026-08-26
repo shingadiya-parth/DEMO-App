@@ -100,12 +100,13 @@ class PlayViewModel(
         viewModelScope.launch {
             val user = userRepository.getCurrentUser() ?: return@launch
             val config = AdActionConfig(
-                actionKey = "REWARDED_2X_${game.gameId}",
-                rewardAmount = game.baseRewardCoins,
+                rewardType = com.example.services.ads.AdRewardType.AD_DOUBLE_GAME_COINS,
                 source = "rewarded_ad_${game.gameId}",
+                rewardAmount = game.baseRewardCoins,
                 cooldownSeconds = 30L,
                 dailyLimit = 5,
-                title = "2x Coin Multiplier"
+                title = "2x Coin Multiplier",
+                actionKeyOverride = "REWARDED_2X_${game.gameId}"
             )
 
             adMobService.showRewardedAd(

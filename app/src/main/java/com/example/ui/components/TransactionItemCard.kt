@@ -90,6 +90,9 @@ fun TransactionItemCard(
                             TransactionType.SPIN_REWARD -> Icons.Filled.Casino
                             TransactionType.SCRATCH_REWARD -> Icons.Filled.Extension
                             TransactionType.PUZZLE_REWARD -> Icons.Filled.Gamepad
+                            TransactionType.COIN_TOSS_REWARD -> Icons.Filled.MonetizationOn
+                            TransactionType.TIC_TAC_TOE_REWARD -> Icons.Filled.Gamepad
+                            TransactionType.BUBBLE_POP_REWARD -> Icons.Filled.Gamepad
                             TransactionType.REFERRAL_REWARD -> Icons.Filled.TrendingUp
                             TransactionType.AD_REWARD -> Icons.Filled.OndemandVideo
                             TransactionType.GIVEAWAY_REWARD -> Icons.Filled.CardGiftcard

@@ -53,6 +53,10 @@ import com.example.ui.navigation.Screen
 import com.example.ui.screens.auth.AuthViewModel
 import com.example.ui.screens.auth.LoginScreen
 import com.example.ui.screens.auth.SignUpScreen
+import com.example.ui.screens.bubble.BubblePopScreen
+import com.example.ui.screens.bubble.BubblePopViewModel
+import com.example.ui.screens.cointoss.CoinTossScreen
+import com.example.ui.screens.cointoss.CoinTossViewModel
 import com.example.ui.screens.earn.EarnScreen
 import com.example.ui.screens.earn.EarnViewModel
 import com.example.ui.screens.home.HomeScreen
@@ -61,12 +65,20 @@ import com.example.ui.screens.play.PlayScreen
 import com.example.ui.screens.play.PlayViewModel
 import com.example.ui.screens.profile.ProfileScreen
 import com.example.ui.screens.profile.ProfileViewModel
+import com.example.ui.screens.puzzle.PuzzleScreen
+import com.example.ui.screens.puzzle.PuzzleViewModel
+import com.example.ui.screens.refer.ReferEarnScreen
+import com.example.ui.screens.refer.ReferEarnViewModel
 import com.example.ui.screens.rewards.RewardsScreen
 import com.example.ui.screens.rewards.RewardsViewModel
+import com.example.ui.screens.scratch.ScratchScreen
+import com.example.ui.screens.scratch.ScratchViewModel
 import com.example.ui.screens.settings.SettingsScreen
 import com.example.ui.screens.settings.SettingsViewModel
 import com.example.ui.screens.spin.SpinScreen
 import com.example.ui.screens.spin.SpinViewModel
+import com.example.ui.screens.tictactoe.TicTacToeScreen
+import com.example.ui.screens.tictactoe.TicTacToeViewModel
 import com.example.ui.screens.wallet.WalletScreen
 import com.example.ui.screens.wallet.WalletViewModel
 import com.example.ui.theme.AppColors
@@ -224,10 +236,12 @@ fun MainAppShell(
     val isTopBarVisible = currentRoute != Screen.Settings.route && 
                           currentRoute != Screen.Profile.route && 
                           currentRoute != Screen.Wallet.route &&
-                          currentRoute != Screen.Home.route
+                          currentRoute != Screen.Home.route &&
+                          currentRoute != Screen.ReferEarn.route
     val isBottomBarVisible = currentRoute != Screen.Settings.route && 
                              currentRoute != Screen.Profile.route && 
-                             currentRoute != Screen.Wallet.route
+                             currentRoute != Screen.Wallet.route &&
+                             currentRoute != Screen.ReferEarn.route
 
     Scaffold(
         modifier = Modifier
@@ -297,6 +311,7 @@ fun MainAppShell(
                 )
                 PlayScreen(
                     viewModel = playViewModel,
+                    onNavigateToGame = { route -> navController.navigate(route) },
                     snackbarHostState = snackbarHostState
                 )
             }
@@ -304,14 +319,95 @@ fun MainAppShell(
             composable(Screen.Spin.route) {
                 val spinViewModel: SpinViewModel = viewModel(
                     factory = SpinViewModel.Factory(
-                        container.rewardEngine,
-                        container.gameRepository,
-                        container.adMobService,
-                        container.userRepository
+                        container.spinGameEngine,
+                        container.walletRepository,
+                        container.userRepository,
+                        container.adMobService
                     )
                 )
                 SpinScreen(
                     viewModel = spinViewModel,
+                    onBack = { navController.popBackStack() },
+                    snackbarHostState = snackbarHostState
+                )
+            }
+
+            composable(Screen.Scratch.route) {
+                val scratchViewModel: ScratchViewModel = viewModel(
+                    factory = ScratchViewModel.Factory(
+                        container.scratchGameEngine,
+                        container.walletRepository,
+                        container.userRepository,
+                        container.adMobService
+                    )
+                )
+                ScratchScreen(
+                    viewModel = scratchViewModel,
+                    onBack = { navController.popBackStack() },
+                    snackbarHostState = snackbarHostState
+                )
+            }
+
+            composable(Screen.Puzzle.route) {
+                val puzzleViewModel: PuzzleViewModel = viewModel(
+                    factory = PuzzleViewModel.Factory(
+                        container.puzzleGameEngine,
+                        container.walletRepository,
+                        container.userRepository,
+                        container.adMobService
+                    )
+                )
+                PuzzleScreen(
+                    viewModel = puzzleViewModel,
+                    onBack = { navController.popBackStack() },
+                    snackbarHostState = snackbarHostState
+                )
+            }
+
+            composable(Screen.CoinToss.route) {
+                val coinTossViewModel: CoinTossViewModel = viewModel(
+                    factory = CoinTossViewModel.Factory(
+                        container.coinTossGameEngine,
+                        container.walletRepository,
+                        container.userRepository,
+                        container.adMobService
+                    )
+                )
+                CoinTossScreen(
+                    viewModel = coinTossViewModel,
+                    onBack = { navController.popBackStack() },
+                    snackbarHostState = snackbarHostState
+                )
+            }
+
+            composable(Screen.TicTacToe.route) {
+                val ticTacToeViewModel: TicTacToeViewModel = viewModel(
+                    factory = TicTacToeViewModel.Factory(
+                        container.ticTacToeGameEngine,
+                        container.walletRepository,
+                        container.userRepository,
+                        container.adMobService
+                    )
+                )
+                TicTacToeScreen(
+                    viewModel = ticTacToeViewModel,
+                    onBack = { navController.popBackStack() },
+                    snackbarHostState = snackbarHostState
+                )
+            }
+
+            composable(Screen.BubblePop.route) {
+                val bubblePopViewModel: BubblePopViewModel = viewModel(
+                    factory = BubblePopViewModel.Factory(
+                        container.bubblePopGameEngine,
+                        container.walletRepository,
+                        container.userRepository,
+                        container.adMobService
+                    )
+                )
+                BubblePopScreen(
+                    viewModel = bubblePopViewModel,
+                    onBack = { navController.popBackStack() },
                     snackbarHostState = snackbarHostState
                 )
             }
@@ -325,6 +421,21 @@ fun MainAppShell(
                 )
                 EarnScreen(
                     viewModel = earnViewModel,
+                    snackbarHostState = snackbarHostState,
+                    onNavigateToRefer = { navController.navigate(Screen.ReferEarn.route) }
+                )
+            }
+
+            composable(Screen.ReferEarn.route) {
+                val referEarnViewModel: ReferEarnViewModel = viewModel(
+                    factory = ReferEarnViewModel.Factory(
+                        container.referralRepository,
+                        container.userRepository
+                    )
+                )
+                ReferEarnScreen(
+                    viewModel = referEarnViewModel,
+                    onBack = { navController.popBackStack() },
                     snackbarHostState = snackbarHostState
                 )
             }
@@ -370,7 +481,8 @@ fun MainAppShell(
                 ProfileScreen(
                     viewModel = profileViewModel,
                     onBack = { navController.popBackStack() },
-                    snackbarHostState = snackbarHostState
+                    snackbarHostState = snackbarHostState,
+                    onNavigateToRefer = { navController.navigate(Screen.ReferEarn.route) }
                 )
             }
 

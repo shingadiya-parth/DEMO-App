@@ -23,16 +23,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.services.ads.AdEnvironment
+import com.example.services.ads.AdMobConfig
 import com.example.services.ads.AdPlacement
+import com.example.ui.theme.AppColors
+import com.example.ui.theme.AppRadius
 
 /**
  * Standard AdMob Banner View Container.
- * Prepared for AdMob SDK AdView rendering.
+ * Formatted for standard 320x50 / adaptive banner display.
+ * Includes graceful fallback and test mode indicator.
  */
 @Composable
 fun AdBannerContainer(
@@ -43,10 +47,10 @@ fun AdBannerContainer(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(AppRadius.sm))
+            .border(1.dp, AppColors.SurfaceBorder, RoundedCornerShape(AppRadius.sm))
             .testTag("admob_banner_container"),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        color = AppColors.SurfaceLight
     ) {
         Row(
             modifier = Modifier
@@ -59,14 +63,14 @@ fun AdBannerContainer(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .background(AppColors.Primary.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "Ad",
+                        text = if (AdMobConfig.environment == AdEnvironment.DEVELOPMENT_TEST) "TEST AD" else "AD",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = AppColors.Primary,
                             fontSize = 10.sp
                         )
                     )
@@ -74,14 +78,14 @@ fun AdBannerContainer(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "AdMob Banner Slot",
+                        text = "Google AdMob Banner Slot",
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = AppColors.TextNavy
                     )
                     Text(
-                        text = "ID: ${placement.slotId.take(18)}...",
+                        text = "Unit: ${placement.slotId.take(22)}...",
                         style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = AppColors.TextSecondary
                     )
                 }
             }
@@ -89,7 +93,7 @@ fun AdBannerContainer(
             Icon(
                 imageVector = Icons.Filled.Info,
                 contentDescription = "AdMob Slot Info",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                tint = AppColors.TextSecondary.copy(alpha = 0.6f),
                 modifier = Modifier.size(16.dp)
             )
         }

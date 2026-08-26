@@ -1,3 +1,11 @@
 <resources>
     <string name="app_name">PlayRewards</string>
+    <!-- Default Google & Firebase App Measurement Identifiers -->
+    <string name="google_app_id" translatable="false">1:103317371234:android:a1b2c3d4e5f6g7h8i9j0k1</string>
+    <string name="gcm_defaultSenderId" translatable="false">103317371234</string>
+    <string name="default_web_client_id" translatable="false">103317371234-mockclientid.apps.googleusercontent.com</string>
+    <string name="firebase_database_url" translatable="false">https://playrewards-app-default.firebaseio.com</string>
+    <string name="google_api_key" translatable="false">AIzaSyB_PlayRewardsSampleKey_1234567890</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyB_PlayRewardsSampleKey_1234567890</string>
+    <string name="project_id" translatable="false">playrewards-app</string>
 </resources>

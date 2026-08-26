@@ -46,6 +46,10 @@ object AppColors {
     val ActionOrange = Color(0xFFF97316) // Energetic coral orange for hot actions
     val ActionOrangeLight = Color(0xFFFFEDD5)
     val ActionOrangeDark = Color(0xFFC2410C)
+    val AccentCoral = Color(0xFFEF4444)
+    val AccentCyan = Color(0xFF06B6D4)
+    val WarningAmberLight = Color(0xFFFEF3C7)
+    val WarningAmberDark = Color(0xFFB45309)
     val CoralRed = Color(0xFFEF4444)
     val CoralLight = Color(0xFFFEE2E2)
 

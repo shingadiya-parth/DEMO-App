@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.TrendingUp
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.Gamepad
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.TrendingUp
@@ -44,6 +46,41 @@ sealed class Screen(
         title = "Spin",
         selectedIcon = Icons.Filled.Refresh,
         unselectedIcon = Icons.Outlined.Refresh
+    )
+
+    data object Scratch : Screen(
+        route = "scratch",
+        title = "Scratch",
+        selectedIcon = Icons.Filled.CardGiftcard,
+        unselectedIcon = Icons.Outlined.CardGiftcard
+    )
+
+    data object Puzzle : Screen(
+        route = "puzzle",
+        title = "Puzzle",
+        selectedIcon = Icons.Filled.Psychology,
+        unselectedIcon = Icons.Outlined.Psychology
+    )
+
+    data object CoinToss : Screen(
+        route = "coin_toss",
+        title = "Coin Toss",
+        selectedIcon = Icons.Filled.Refresh,
+        unselectedIcon = Icons.Outlined.Refresh
+    )
+
+    data object TicTacToe : Screen(
+        route = "tictactoe",
+        title = "Tic-Tac-Toe",
+        selectedIcon = Icons.Filled.Gamepad,
+        unselectedIcon = Icons.Outlined.Gamepad
+    )
+
+    data object BubblePop : Screen(
+        route = "bubble_pop",
+        title = "Bubble Pop",
+        selectedIcon = Icons.Filled.Gamepad,
+        unselectedIcon = Icons.Outlined.Gamepad
     )
 
     data object Earn : Screen(
@@ -79,6 +116,13 @@ sealed class Screen(
         title = "Profile & Settings",
         selectedIcon = Icons.Filled.Settings,
         unselectedIcon = Icons.Outlined.Settings
+    )
+
+    data object ReferEarn : Screen(
+        route = "refer_earn",
+        title = "Refer & Earn",
+        selectedIcon = Icons.Filled.Person,
+        unselectedIcon = Icons.Outlined.Person
     )
 
     companion object {

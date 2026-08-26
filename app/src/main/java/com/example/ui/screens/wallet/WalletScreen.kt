@@ -567,6 +567,9 @@ private fun EnhancedTransactionCard(transaction: CoinTransaction) {
                         TransactionType.SPIN_REWARD -> Icons.Filled.Refresh
                         TransactionType.SCRATCH_REWARD -> Icons.Filled.Stars
                         TransactionType.PUZZLE_REWARD -> Icons.Filled.PlayCircleOutline
+                        TransactionType.COIN_TOSS_REWARD -> Icons.Filled.MonetizationOn
+                        TransactionType.TIC_TAC_TOE_REWARD -> Icons.Filled.Gamepad
+                        TransactionType.BUBBLE_POP_REWARD -> Icons.Filled.Gamepad
                         TransactionType.DAILY_BONUS -> Icons.Filled.MonetizationOn
                         TransactionType.REFERRAL_REWARD -> Icons.Filled.TrendingUp
                         TransactionType.AD_REWARD -> Icons.Filled.PlayCircleOutline

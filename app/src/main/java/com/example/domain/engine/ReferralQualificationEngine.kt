@@ -88,7 +88,10 @@ class ReferralQualificationEngine(
             )
             referralDao.updateReferral(qualifiedRecord)
 
-            notificationService.emitReferralQualified(qualifiedRecord.referrerRewardAmount)
+            notificationService.emitReferralQualified(
+                userId = record.referrerUserId,
+                rewardCoins = qualifiedRecord.referrerRewardAmount
+            )
 
             // Trigger authoritative reward payout via RewardEngine
             val rewardResult = rewardEngine.processReferralReward(qualifiedRecord)
@@ -96,11 +99,13 @@ class ReferralQualificationEngine(
             val finalRecord = when (rewardResult) {
                 is ReferralRewardGrantResult.Success -> {
                     notificationService.emitReferralRewardCredited(
+                        userId = record.referrerUserId,
                         coins = rewardResult.referrerCoinsGranted,
                         isInviter = true
                     )
                     if (rewardResult.referredUserCoinsGranted > 0L) {
                         notificationService.emitReferralRewardCredited(
+                            userId = record.referredUserId,
                             coins = rewardResult.referredUserCoinsGranted,
                             isInviter = false
                         )
@@ -133,7 +138,11 @@ class ReferralQualificationEngine(
                 status = ReferralStatus.QUALIFYING
             )
             referralDao.updateReferral(qualifyingRecord)
-            notificationService.emitReferralQualifying(newProgress, target)
+            notificationService.emitReferralQualifying(
+                userId = record.referrerUserId,
+                progress = newProgress,
+                target = target
+            )
             return QualificationEvaluationResult.ProgressUpdated(newProgress, target)
         }
     }

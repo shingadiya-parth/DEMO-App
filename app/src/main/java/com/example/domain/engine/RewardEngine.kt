@@ -1,10 +1,21 @@
 package com.example.domain.engine
 
 import com.example.core.config.ReferralConfig
+import com.example.core.security.FraudRiskEngine
 import com.example.core.security.IdempotencyManager
+import com.example.core.security.RateLimitAction
+import com.example.core.security.RateLimitResult
+import com.example.core.security.RateLimiter
+import com.example.core.security.SecurityEventLogger
 import com.example.data.model.AccountStatus
+import com.example.data.model.ActivityCategory
+import com.example.data.model.ActivityType
+import com.example.data.model.FraudRiskState
 import com.example.data.model.ReferralRecord
+import com.example.data.model.SecurityEventType
+import com.example.data.model.SecuritySeverity
 import com.example.data.model.TransactionType
+import com.example.data.repository.ActivityRepository
 import com.example.data.repository.GameRepository
 import com.example.data.repository.TransactionResult
 import com.example.data.repository.UserRepository
@@ -13,6 +24,7 @@ import com.example.services.ads.AdActionConfig
 import com.example.services.ads.AdAnalytics
 import com.example.services.ads.AdAnalyticsEvent
 import com.example.services.ads.AdMobConfig
+import com.example.services.notifications.NotificationService
 
 /**
  * Result of a Reward Engine processing operation.
@@ -60,7 +72,11 @@ sealed class ReferralRewardGrantResult {
 class RewardEngine(
     private val walletRepository: WalletRepository,
     private val gameRepository: GameRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    var activityRepository: ActivityRepository? = null,
+    var notificationService: NotificationService? = null,
+    var securityEventLogger: SecurityEventLogger? = null,
+    var fraudRiskEngine: FraudRiskEngine? = null
 ) {
 
     var referralQualificationEngine: ReferralQualificationEngine? = null
@@ -79,11 +95,53 @@ class RewardEngine(
     ): RewardGrantResult {
         // 1. Verify authenticated user
         if (userId.isBlank()) {
+            securityEventLogger?.logEvent(
+                userId = "anonymous",
+                eventType = SecurityEventType.UNAUTHORIZED_ACCESS_ATTEMPT,
+                severity = SecuritySeverity.HIGH,
+                relatedId = referenceId,
+                metadata = "Anonymous reward attempt for $source"
+            )
             return RewardGrantResult.Rejected("Authentication required")
+        }
+
+        // 2. Rate Limit Protection
+        val rateCheck = RateLimiter.checkAndRecord(userId, RateLimitAction.REWARD_REQUEST)
+        if (rateCheck is RateLimitResult.Exceeded) {
+            securityEventLogger?.logEvent(
+                userId = userId,
+                eventType = SecurityEventType.RATE_LIMIT_TRIGGERED,
+                severity = SecuritySeverity.MEDIUM,
+                relatedId = referenceId,
+                metadata = "Rate limit exceeded on REWARD_REQUEST: ${rateCheck.message}"
+            )
+            return RewardGrantResult.Rejected(rateCheck.message)
+        }
+
+        // 3. Risk Engine Audit
+        fraudRiskEngine?.let { riskEngine ->
+            val riskResult = riskEngine.evaluateUserRisk(userId)
+            if (riskResult.riskState == FraudRiskState.BLOCKED) {
+                securityEventLogger?.logEvent(
+                    userId = userId,
+                    eventType = SecurityEventType.UNAUTHORIZED_ACCESS_ATTEMPT,
+                    severity = SecuritySeverity.CRITICAL,
+                    relatedId = referenceId,
+                    metadata = "Blocked user attempted reward grant: ${riskResult.triggeredFlags.joinToString()}"
+                )
+                return RewardGrantResult.Rejected("Account operations restricted. Please contact support.")
+            }
         }
 
         val user = userRepository.getCurrentUser()
         if (user == null || user.userId != userId) {
+            securityEventLogger?.logEvent(
+                userId = userId,
+                eventType = SecurityEventType.AUTH_SECURITY_EVENT,
+                severity = SecuritySeverity.HIGH,
+                relatedId = referenceId,
+                metadata = "Session mismatch: authenticated=${user?.userId} vs requested=$userId"
+            )
             return RewardGrantResult.Rejected("User account session mismatch")
         }
 
@@ -91,12 +149,12 @@ class RewardEngine(
             return RewardGrantResult.Rejected("Account status is ${user.accountStatus}")
         }
 
-        // 2. Validate amount
+        // 4. Validate amount
         if (amount <= 0L) {
             return RewardGrantResult.Rejected("Reward amount must be greater than 0")
         }
 
-        // 3. Atomically credit wallet via central ledger
+        // 5. Atomically credit wallet via central ledger
         val txResult = walletRepository.addCoins(
             userId = userId,
             type = rewardType,
@@ -117,6 +175,13 @@ class RewardEngine(
                 )
             }
             is TransactionResult.Duplicate -> {
+                securityEventLogger?.logEvent(
+                    userId = userId,
+                    eventType = SecurityEventType.DUPLICATE_REWARD_ATTEMPT,
+                    severity = SecuritySeverity.LOW,
+                    relatedId = referenceId,
+                    metadata = "Duplicate reward claim detected for key $idempotencyKey"
+                )
                 RewardGrantResult.AlreadyClaimed(
                     existingCoins = txResult.existingTransaction.amount,
                     currentBalance = txResult.currentBalance,
@@ -202,6 +267,35 @@ class RewardEngine(
         if (result is RewardGrantResult.Success) {
             gameRepository.recordGamePlay(userId, gameId, finalCoins)
             referralQualificationEngine?.evaluateUserProgress(userId, 1)
+
+            val activityType = when (gameId) {
+                "spin_win" -> ActivityType.SPIN_COMPLETED
+                "scratch_card", "scratch_reveal" -> ActivityType.SCRATCH_COMPLETED
+                "tile_puzzle", "puzzles", "puzzle", "word_guess" -> ActivityType.PUZZLE_COMPLETED
+                "coin_toss" -> ActivityType.COIN_TOSS_COMPLETED
+                "tictactoe" -> ActivityType.TIC_TAC_TOE_COMPLETED
+                "bubble_pop" -> ActivityType.BUBBLE_POP_COMPLETED
+                else -> ActivityType.SPIN_COMPLETED
+            }
+
+            val gameTitle = game?.gameName ?: gameId.replace('_', ' ').replaceFirstChar { it.uppercase() }
+
+            activityRepository?.recordActivity(
+                userId = userId,
+                activityType = activityType,
+                category = ActivityCategory.GAMES,
+                title = gameTitle,
+                description = "Completed successfully",
+                relatedId = sessionId,
+                result = "+$finalCoins NestCoins"
+            )
+
+            notificationService?.emitRewardEarned(
+                userId = userId,
+                coins = finalCoins,
+                gameOrActivityName = gameTitle,
+                relatedId = sessionId
+            )
         }
 
         return result
@@ -245,6 +339,23 @@ class RewardEngine(
                         "amount" to actionConfig.rewardAmount,
                         "transactionId" to result.transactionId
                     )
+                )
+
+                activityRepository?.recordActivity(
+                    userId = userId,
+                    activityType = ActivityType.AD_REWARD_CLAIMED,
+                    category = ActivityCategory.REWARDS,
+                    title = "📺 Rewarded Video",
+                    description = "Watched video ad for bonus coins",
+                    relatedId = rewardRequestId,
+                    result = "+${actionConfig.rewardAmount} NestCoins"
+                )
+
+                notificationService?.emitRewardEarned(
+                    userId = userId,
+                    coins = actionConfig.rewardAmount,
+                    gameOrActivityName = "Bonus Video Ad",
+                    relatedId = rewardRequestId
                 )
             }
             is RewardGrantResult.AlreadyClaimed -> {

@@ -105,11 +105,12 @@ object AdMobConfig {
     const val GOOGLE_TEST_REWARDED_ID = "ca-app-pub-3940256099942544/5224354917"
     const val GOOGLE_TEST_REWARDED_INTERSTITIAL_ID = "ca-app-pub-3940256099942544/5354046379"
 
-    // Configurable Production IDs (placeholders until provided in production secrets)
-    var productionAppId: String? = null
-    var productionBannerId: String? = null
-    var productionInterstitialId: String? = null
-    var productionRewardedId: String? = null
+    // Production AdMob IDs (Configured from User AdMob Console)
+    var productionAppId: String? = "ca-app-pub-6519190170203543~2092384205"
+    var productionBannerId: String? = "ca-app-pub-6519190170203543/4114138818"
+    var productionInterstitialId: String? = "ca-app-pub-6519190170203543/7153139198"
+    var productionRewardedId: String? = "ca-app-pub-6519190170203543/7805971811"
+    var productionAppOpenId: String? = "ca-app-pub-6519190170203543/9587730845"
 
     // Interstitial Policy Controls
     var isInterstitialEnabled: Boolean = true
@@ -166,6 +167,16 @@ object AdMobConfig {
         return when (environment) {
             AdEnvironment.DEVELOPMENT_TEST -> GOOGLE_TEST_REWARDED_ID
             AdEnvironment.PRODUCTION -> productionRewardedId ?: GOOGLE_TEST_REWARDED_ID
+        }
+    }
+
+    /**
+     * Resolves the active App Open Ad Unit ID.
+     */
+    fun getAppOpenAdUnitId(): String {
+        return when (environment) {
+            AdEnvironment.DEVELOPMENT_TEST -> "ca-app-pub-3940256099942544/9257395921"
+            AdEnvironment.PRODUCTION -> productionAppOpenId ?: "ca-app-pub-3940256099942544/9257395921"
         }
     }
 

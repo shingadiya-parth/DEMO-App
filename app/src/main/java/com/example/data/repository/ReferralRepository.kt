@@ -159,7 +159,10 @@ class ReferralRepository(
         userDao.updateUser(updatedUser)
 
         // 7. Emit in-app notification
-        notificationService.emitFriendJoined(referrer.referralCode)
+        notificationService.emitFriendJoined(
+            userId = referrer.userId,
+            referralCode = referrer.referralCode
+        )
 
         return Result.success(record)
     }

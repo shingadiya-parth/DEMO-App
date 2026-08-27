@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -70,12 +71,18 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+
 @Composable
 fun ProfileScreen(
     viewModel: ProfileViewModel,
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState,
     onNavigateToRefer: () -> Unit = {},
+    onNavigateToActivity: () -> Unit = {},
+    onNavigateToNotifications: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -374,6 +381,121 @@ fun ProfileScreen(
                             text = "Dashboard",
                             onClick = onNavigateToRefer,
                             modifier = Modifier.testTag("profile_refer_dashboard_btn")
+                        )
+                    }
+                }
+            }
+        }
+
+        // Activity & Notifications Shortcuts
+        item {
+            Spacer(modifier = Modifier.height(AppSpacing.md))
+            AppSectionHeader(title = "Activity & Alerts")
+
+            AppCard(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = AppSpacing.screenHorizontal),
+                backgroundColor = AppColors.SurfaceLight
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToActivity() }
+                            .padding(vertical = AppSpacing.xs)
+                            .testTag("profile_activity_history_btn"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.PrimaryLight),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.History,
+                                    contentDescription = null,
+                                    tint = AppColors.Primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(AppSpacing.sm))
+                            Column {
+                                Text(
+                                    text = "Activity History",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp
+                                    ),
+                                    color = AppColors.TextNavy
+                                )
+                                Text(
+                                    text = "Timeline of all games, bonuses & redemptions",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = AppColors.TextSecondary
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = AppColors.TextMuted,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(AppSpacing.sm))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToNotifications() }
+                            .padding(vertical = AppSpacing.xs)
+                            .testTag("profile_notifications_btn"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.ActionOrange.copy(alpha = 0.15f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Notifications,
+                                    contentDescription = null,
+                                    tint = AppColors.ActionOrange,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(AppSpacing.sm))
+                            Column {
+                                Text(
+                                    text = "Notification Center",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 14.sp
+                                    ),
+                                    color = AppColors.TextNavy
+                                )
+                                Text(
+                                    text = "Inbox alerts and communication preferences",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = AppColors.TextSecondary
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = AppColors.TextMuted,
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                 }

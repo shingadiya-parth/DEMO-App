@@ -50,6 +50,8 @@ import com.example.ui.components.AppBottomNavigation
 import com.example.ui.components.AppTopBar
 import com.example.ui.components.TransactionHistoryDialog
 import com.example.ui.navigation.Screen
+import com.example.ui.screens.activity.ActivityScreen
+import com.example.ui.screens.activity.ActivityViewModel
 import com.example.ui.screens.auth.AuthViewModel
 import com.example.ui.screens.auth.LoginScreen
 import com.example.ui.screens.auth.SignUpScreen
@@ -61,6 +63,8 @@ import com.example.ui.screens.earn.EarnScreen
 import com.example.ui.screens.earn.EarnViewModel
 import com.example.ui.screens.home.HomeScreen
 import com.example.ui.screens.home.HomeViewModel
+import com.example.ui.screens.notifications.NotificationsScreen
+import com.example.ui.screens.notifications.NotificationViewModel
 import com.example.ui.screens.play.PlayScreen
 import com.example.ui.screens.play.PlayViewModel
 import com.example.ui.screens.profile.ProfileScreen
@@ -237,11 +241,15 @@ fun MainAppShell(
                           currentRoute != Screen.Profile.route && 
                           currentRoute != Screen.Wallet.route &&
                           currentRoute != Screen.Home.route &&
-                          currentRoute != Screen.ReferEarn.route
+                          currentRoute != Screen.ReferEarn.route &&
+                          currentRoute != Screen.Notifications.route &&
+                          currentRoute != Screen.Activity.route
     val isBottomBarVisible = currentRoute != Screen.Settings.route && 
                              currentRoute != Screen.Profile.route && 
                              currentRoute != Screen.Wallet.route &&
-                             currentRoute != Screen.ReferEarn.route
+                             currentRoute != Screen.ReferEarn.route &&
+                             currentRoute != Screen.Notifications.route &&
+                             currentRoute != Screen.Activity.route
 
     Scaffold(
         modifier = Modifier
@@ -254,7 +262,7 @@ fun MainAppShell(
                     userName = currentUser?.displayName ?: "Player",
                     onCoinClick = { navController.navigate(Screen.Wallet.route) },
                     onProfileClick = { navController.navigate(Screen.Profile.route) },
-                    onNotificationClick = { isLedgerSheetVisible = true }
+                    onNotificationClick = { navController.navigate(Screen.Notifications.route) }
                 )
             }
         },
@@ -482,7 +490,9 @@ fun MainAppShell(
                     viewModel = profileViewModel,
                     onBack = { navController.popBackStack() },
                     snackbarHostState = snackbarHostState,
-                    onNavigateToRefer = { navController.navigate(Screen.ReferEarn.route) }
+                    onNavigateToRefer = { navController.navigate(Screen.ReferEarn.route) },
+                    onNavigateToActivity = { navController.navigate(Screen.Activity.route) },
+                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) }
                 )
             }
 
@@ -499,7 +509,53 @@ fun MainAppShell(
                     onBack = { navController.popBackStack() },
                     onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
                     onLoggedOut = { /* Transitions via authState automatically */ },
-                    snackbarHostState = snackbarHostState
+                    snackbarHostState = snackbarHostState,
+                    onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
+                    onNavigateToActivity = { navController.navigate(Screen.Activity.route) }
+                )
+            }
+
+            composable(Screen.Notifications.route) {
+                val notificationViewModel: NotificationViewModel = viewModel(
+                    factory = NotificationViewModel.provideFactory(
+                        container.notificationRepository,
+                        container.authRepository
+                    )
+                )
+                NotificationsScreen(
+                    viewModel = notificationViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateDeepLink = { link ->
+                        when (link.lowercase()) {
+                            "wallet" -> navController.navigate(Screen.Wallet.route)
+                            "refer", "refer_earn", "invite" -> navController.navigate(Screen.ReferEarn.route)
+                            "rewards", "redeem", "redemption" -> navController.navigate(Screen.Rewards.route)
+                            "earn", "daily_bonus" -> navController.navigate(Screen.Earn.route)
+                            "play", "games" -> navController.navigate(Screen.Play.route)
+                            "activity" -> navController.navigate(Screen.Activity.route)
+                            "spin" -> navController.navigate(Screen.Spin.route)
+                            "scratch" -> navController.navigate(Screen.Scratch.route)
+                            "puzzle" -> navController.navigate(Screen.Puzzle.route)
+                            "cointoss" -> navController.navigate(Screen.CoinToss.route)
+                            "tictactoe" -> navController.navigate(Screen.TicTacToe.route)
+                            "bubble" -> navController.navigate(Screen.BubblePop.route)
+                            else -> navController.navigate(link)
+                        }
+                    }
+                )
+            }
+
+            composable(Screen.Activity.route) {
+                val activityViewModel: ActivityViewModel = viewModel(
+                    factory = ActivityViewModel.provideFactory(
+                        container.activityRepository,
+                        container.authRepository
+                    )
+                )
+                ActivityScreen(
+                    viewModel = activityViewModel,
+                    onNavigateBack = { navController.popBackStack() },
+                    onExploreGames = { navController.navigate(Screen.Play.route) }
                 )
             }
         }

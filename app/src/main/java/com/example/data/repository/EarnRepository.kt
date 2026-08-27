@@ -4,12 +4,15 @@ import com.example.core.config.DailyBonusConfig
 import com.example.core.security.IdempotencyManager
 import com.example.data.local.DailyStreakDao
 import com.example.data.model.AccountStatus
+import com.example.data.model.ActivityCategory
+import com.example.data.model.ActivityType
 import com.example.data.model.DailyStreak
 import com.example.data.model.EarnActivity
 import com.example.data.model.EarnActivityType
 import com.example.data.model.TransactionType
 import com.example.domain.engine.RewardEngine
 import com.example.domain.engine.RewardGrantResult
+import com.example.services.notifications.NotificationService
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -20,7 +23,9 @@ class EarnRepository(
     private val walletRepository: WalletRepository,
     private val userRepository: UserRepository,
     private val rewardEngine: RewardEngine,
-    private val dailyStreakDao: DailyStreakDao
+    private val dailyStreakDao: DailyStreakDao,
+    private val activityRepository: ActivityRepository? = null,
+    private val notificationService: NotificationService? = null
 ) {
 
     private val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
@@ -119,6 +124,22 @@ class EarnRepository(
                 totalClaimsCount = currentRecord.totalClaimsCount + 1
             )
             dailyStreakDao.insertOrUpdateStreak(updatedStreak)
+
+            activityRepository?.recordActivity(
+                userId = userId,
+                activityType = ActivityType.DAILY_BONUS_CLAIMED,
+                category = ActivityCategory.REWARDS,
+                title = "🎁 Daily Bonus",
+                description = "Day $newStreak Streak bonus claimed",
+                relatedId = "daily_$todayStr",
+                result = "+$rewardAmount NestCoins"
+            )
+
+            notificationService?.emitDailyBonus(
+                userId = userId,
+                coins = rewardAmount,
+                streakDays = newStreak
+            )
         }
 
         return result

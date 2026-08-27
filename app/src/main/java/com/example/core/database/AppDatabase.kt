@@ -13,6 +13,7 @@ import com.example.data.local.GamePlayStatsDao
 import com.example.data.local.NotificationDao
 import com.example.data.local.RedemptionDao
 import com.example.data.local.ReferralDao
+import com.example.data.local.SecurityEventDao
 import com.example.data.local.UserDao
 import com.example.data.local.WalletDao
 import com.example.data.model.AppNotificationRecord
@@ -22,6 +23,7 @@ import com.example.data.model.DailyStreak
 import com.example.data.model.GamePlayStats
 import com.example.data.model.RedemptionRequest
 import com.example.data.model.ReferralRecord
+import com.example.data.model.SecurityEvent
 import com.example.data.model.UserAccount
 import com.example.data.model.UserActivityRecord
 import com.example.data.model.Wallet
@@ -37,9 +39,10 @@ import com.example.data.model.Wallet
         DailyStreak::class,
         ReferralRecord::class,
         AppNotificationRecord::class,
-        UserActivityRecord::class
+        UserActivityRecord::class,
+        SecurityEvent::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -55,6 +58,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun referralDao(): ReferralDao
     abstract fun notificationDao(): NotificationDao
     abstract fun activityDao(): ActivityDao
+    abstract fun securityEventDao(): SecurityEventDao
 
     companion object {
         @Volatile

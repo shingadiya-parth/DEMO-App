@@ -33,10 +33,13 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Gamepad
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Stars
+import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +54,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +66,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.config.DailyBonusConfig
+import com.example.data.model.CoinTransaction
 import com.example.data.model.GameDefinition
+import com.example.data.model.TransactionType
 import com.example.domain.engine.CoinConversionHelper
 import com.example.services.ads.AdPlacement
 import com.example.ui.components.AdBannerContainer
@@ -78,6 +84,9 @@ import com.example.ui.theme.AppColors
 import com.example.ui.theme.AppElevation
 import com.example.ui.theme.AppRadius
 import com.example.ui.theme.AppSpacing
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Step 5 — Production Home Screen with Authoritative Daily Bonus,
@@ -93,6 +102,7 @@ fun HomeScreen(
     val user by viewModel.currentUser.collectAsState()
     val balance by viewModel.currentBalance.collectAsState()
     val streak by viewModel.currentStreak.collectAsState()
+    val transactions by viewModel.transactions.collectAsState()
     val dailyBonusState by viewModel.dailyBonusState.collectAsState()
     val rewardSuccessDialog by viewModel.rewardSuccessDialog.collectAsState()
     val toastMessage by viewModel.toastMessage.collectAsState()
@@ -126,7 +136,7 @@ fun HomeScreen(
                 greeting = greeting,
                 userName = displayName,
                 onProfileClick = { onNavigateTo(Screen.Profile.route) },
-                onNotificationClick = { onNavigateTo(Screen.Wallet.route) }
+                onNotificationClick = { onNavigateTo(Screen.Notifications.route) }
             )
         }
 
@@ -269,6 +279,82 @@ fun HomeScreen(
                     rewardValue = "₹${viewModel.nextRewardGoal.rewardValueInr}",
                     onRedeemClick = { onNavigateTo(Screen.Rewards.route) }
                 )
+            }
+        }
+
+        // 8. RECENT TRANSACTIONS / ACTIVITY SECTION
+        item {
+            Spacer(modifier = Modifier.height(AppSpacing.lg))
+            AppSectionHeader(
+                title = "Recent Activity",
+                actionText = "View All",
+                onActionClick = { onNavigateTo(Screen.Wallet.route) }
+            )
+        }
+
+        if (transactions.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.screenHorizontal)
+                ) {
+                    AppCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        backgroundColor = AppColors.SurfaceLight
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(AppSpacing.md),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(AppSpacing.md)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.PrimaryLight),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.History,
+                                    contentDescription = null,
+                                    tint = AppColors.Primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "No Activity Yet",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = AppColors.TextNavy
+                                )
+                                Text(
+                                    text = "Play games or claim your daily bonus to earn coins!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = AppColors.TextSecondary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            items(
+                items = transactions.take(4),
+                key = { "home_tx_${it.transactionId}" }
+            ) { tx ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = AppSpacing.screenHorizontal, vertical = 3.dp)
+                ) {
+                    HomeTransactionItemCard(
+                        transaction = tx,
+                        onClick = { onNavigateTo(Screen.Wallet.route) }
+                    )
+                }
             }
         }
     }
@@ -1069,6 +1155,83 @@ private fun RewardGoalOverviewCard(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeTransactionItemCard(
+    transaction: CoinTransaction,
+    onClick: () -> Unit
+) {
+    val isCredit = transaction.amount >= 0
+    val dateFormat = remember { SimpleDateFormat("MMM dd • hh:mm a", Locale.getDefault()) }
+    val formattedDate = remember(transaction.createdAt) { dateFormat.format(Date(transaction.createdAt)) }
+
+    AppCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .testTag("home_tx_item_${transaction.transactionId}"),
+        backgroundColor = Color.White
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = AppSpacing.md, vertical = AppSpacing.sm),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (isCredit) AppColors.EmeraldLight.copy(alpha = 0.4f)
+                        else AppColors.CoralLight.copy(alpha = 0.4f)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = when (transaction.type) {
+                        TransactionType.GAME_REWARD -> Icons.Filled.Gamepad
+                        TransactionType.SPIN_REWARD -> Icons.Filled.Refresh
+                        TransactionType.SCRATCH_REWARD -> Icons.Filled.Stars
+                        TransactionType.DAILY_BONUS -> Icons.Filled.MonetizationOn
+                        TransactionType.REFERRAL_REWARD -> Icons.Filled.TrendingUp
+                        TransactionType.AD_REWARD -> Icons.Filled.PlayArrow
+                        TransactionType.GIVEAWAY_REWARD -> Icons.Filled.CardGiftcard
+                        TransactionType.REDEMPTION_DEDUCTION -> Icons.Filled.CardGiftcard
+                        else -> Icons.Filled.MonetizationOn
+                    },
+                    contentDescription = transaction.type.displayName,
+                    tint = if (isCredit) AppColors.EmeraldGreen else AppColors.CoralRed,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(AppSpacing.sm))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = transaction.type.displayName,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = AppColors.TextNavy
+                )
+                Text(
+                    text = formattedDate,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppColors.TextSecondary
+                )
+            }
+
+            Text(
+                text = if (isCredit) "+${CoinConversionHelper.formatCoins(transaction.amount)}"
+                else "-${CoinConversionHelper.formatCoins(kotlin.math.abs(transaction.amount))}",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (isCredit) AppColors.EmeraldGreen else AppColors.CoralRed
+                )
+            )
         }
     }
 }

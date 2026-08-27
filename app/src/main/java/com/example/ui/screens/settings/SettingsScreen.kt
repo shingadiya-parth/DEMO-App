@@ -74,6 +74,9 @@ import com.example.ui.theme.AppColors
 import com.example.ui.theme.AppRadius
 import com.example.ui.theme.AppSpacing
 
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Tune
+
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
@@ -81,6 +84,8 @@ fun SettingsScreen(
     onNavigateToProfile: () -> Unit,
     onLoggedOut: () -> Unit,
     snackbarHostState: SnackbarHostState,
+    onNavigateToNotifications: () -> Unit = {},
+    onNavigateToActivity: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -248,6 +253,120 @@ fun SettingsScreen(
                         checked = vibrationEnabled,
                         onCheckedChange = { vibrationEnabled = it }
                     )
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = AppSpacing.xs),
+                        color = AppColors.SurfaceBorder.copy(alpha = 0.5f)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToNotifications() }
+                            .padding(vertical = AppSpacing.sm)
+                            .testTag("settings_notification_center_btn"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.PrimaryLight),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Tune,
+                                    contentDescription = null,
+                                    tint = AppColors.Primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(AppSpacing.md))
+                            Column {
+                                Text(
+                                    text = "Notification Channels",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 14.sp
+                                    ),
+                                    color = AppColors.TextNavy
+                                )
+                                Text(
+                                    text = "Manage granular alert categories",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = AppColors.TextSecondary
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = AppColors.TextMuted,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = AppSpacing.xs),
+                        color = AppColors.SurfaceBorder.copy(alpha = 0.5f)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onNavigateToActivity() }
+                            .padding(vertical = AppSpacing.sm)
+                            .testTag("settings_activity_history_btn"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(AppColors.NavyCard.copy(alpha = 0.08f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.History,
+                                    contentDescription = null,
+                                    tint = AppColors.NavyCard,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(AppSpacing.md))
+                            Column {
+                                Text(
+                                    text = "Activity Log & Timeline",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 14.sp
+                                    ),
+                                    color = AppColors.TextNavy
+                                )
+                                Text(
+                                    text = "View full history of all actions & rewards",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = AppColors.TextSecondary
+                                )
+                            }
+                        }
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
+                            contentDescription = null,
+                            tint = AppColors.TextMuted,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
                 }
             }
         }

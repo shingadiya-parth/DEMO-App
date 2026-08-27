@@ -4,15 +4,27 @@ import androidx.room.withTransaction
 import com.example.core.config.CoinConfig
 import com.example.core.config.RewardCatalogConfig
 import com.example.core.database.AppDatabase
+import com.example.core.security.FraudRiskEngine
+import com.example.core.security.RateLimitAction
+import com.example.core.security.RateLimitResult
+import com.example.core.security.RateLimiter
+import com.example.core.security.SecurityEventLogger
 import com.example.data.local.RedemptionDao
 import com.example.data.model.AccountStatus
+import com.example.data.model.ActivityCategory
+import com.example.data.model.ActivityType
+import com.example.data.model.FraudRiskState
+import com.example.data.model.NotificationType
 import com.example.data.model.RedemptionEligibilityResult
 import com.example.data.model.RedemptionRequest
 import com.example.data.model.RedemptionReward
 import com.example.data.model.RedemptionStatus
 import com.example.data.model.RewardCategory
 import com.example.data.model.RewardStockStatus
+import com.example.data.model.SecurityEventType
+import com.example.data.model.SecuritySeverity
 import com.example.data.model.TransactionType
+import com.example.services.notifications.NotificationService
 import kotlinx.coroutines.flow.Flow
 import java.util.Calendar
 import java.util.UUID
@@ -38,7 +50,11 @@ class RedemptionRepository(
     private val redemptionDao: RedemptionDao,
     private val walletRepository: WalletRepository,
     private val userRepository: UserRepository,
-    private val database: AppDatabase? = null
+    private val database: AppDatabase? = null,
+    private val activityRepository: ActivityRepository? = null,
+    private val notificationService: NotificationService? = null,
+    var securityEventLogger: SecurityEventLogger? = null,
+    var fraudRiskEngine: FraudRiskEngine? = null
 ) {
 
     /**
@@ -171,7 +187,42 @@ class RedemptionRepository(
         idempotencyKey: String? = null
     ): RedemptionResult {
         if (userId.isBlank()) {
+            securityEventLogger?.logEvent(
+                userId = "anonymous",
+                eventType = SecurityEventType.UNAUTHORIZED_ACCESS_ATTEMPT,
+                severity = SecuritySeverity.HIGH,
+                relatedId = rewardId,
+                metadata = "Anonymous redemption request attempted"
+            )
             return RedemptionResult.Error("Unauthorized request. Please log in.")
+        }
+
+        // 1. Rate limit check
+        val rateCheck = RateLimiter.checkAndRecord(userId, RateLimitAction.REDEMPTION_REQUEST)
+        if (rateCheck is RateLimitResult.Exceeded) {
+            securityEventLogger?.logEvent(
+                userId = userId,
+                eventType = SecurityEventType.RATE_LIMIT_TRIGGERED,
+                severity = SecuritySeverity.MEDIUM,
+                relatedId = rewardId,
+                metadata = "Rate limit exceeded on REDEMPTION_REQUEST: ${rateCheck.message}"
+            )
+            return RedemptionResult.Error(rateCheck.message)
+        }
+
+        // 2. Fraud risk evaluation
+        fraudRiskEngine?.let { riskEngine ->
+            val riskResult = riskEngine.evaluateUserRisk(userId)
+            if (riskResult.riskState == FraudRiskState.BLOCKED) {
+                securityEventLogger?.logEvent(
+                    userId = userId,
+                    eventType = SecurityEventType.REDEMPTION_ABUSE,
+                    severity = SecuritySeverity.CRITICAL,
+                    relatedId = rewardId,
+                    metadata = "Blocked user attempted redemption: ${riskResult.triggeredFlags.joinToString()}"
+                )
+                return RedemptionResult.Error("Account redemption privileges are restricted. Please contact support.")
+            }
         }
 
         val cleanedDestination = destinationAccount.trim()
@@ -182,13 +233,20 @@ class RedemptionRepository(
         val reward = getRewardById(rewardId)
             ?: return RedemptionResult.Error("Selected reward does not exist in catalog.")
 
-        // 1. Generate / resolve unique idempotency key
+        // 3. Generate / resolve unique idempotency key
         val actualIdempotencyKey = idempotencyKey?.takeIf { it.isNotBlank() }
             ?: "RED_REQ_${userId}_${rewardId}_${System.currentTimeMillis()}"
 
-        // 2. Idempotency check against existing redemptions
+        // 4. Idempotency check against existing redemptions
         val existingRequest = redemptionDao.getRedemptionByIdempotencyKey(actualIdempotencyKey)
         if (existingRequest != null) {
+            securityEventLogger?.logEvent(
+                userId = userId,
+                eventType = SecurityEventType.DUPLICATE_REWARD_ATTEMPT,
+                severity = SecuritySeverity.LOW,
+                relatedId = existingRequest.redemptionId,
+                metadata = "Duplicate redemption request submission detected ($actualIdempotencyKey)"
+            )
             val balance = walletRepository.getCalculatedBalance(userId)
             return RedemptionResult.Success(
                 request = existingRequest,
@@ -197,13 +255,20 @@ class RedemptionRepository(
             )
         }
 
-        // 3. Authoritative eligibility check
+        // 5. Authoritative eligibility check
         val eligibility = checkRewardEligibility(userId, rewardId)
         if (eligibility is RedemptionEligibilityResult.Ineligible) {
+            securityEventLogger?.logEvent(
+                userId = userId,
+                eventType = SecurityEventType.REDEMPTION_ABUSE,
+                severity = SecuritySeverity.LOW,
+                relatedId = rewardId,
+                metadata = "Ineligible redemption attempted: ${eligibility.reason}"
+            )
             return RedemptionResult.Error(eligibility.reason)
         }
 
-        // 4. Atomic Ledger Deduction & Record Creation
+        // 6. Atomic Ledger Deduction & Record Creation
         val newRedemptionId = "red_${UUID.randomUUID()}"
         val deductionIdempotencyKey = "TX_DEDUCT_$actualIdempotencyKey"
 
@@ -237,6 +302,25 @@ class RedemptionRepository(
                 )
 
                 redemptionDao.insertRequest(redemptionRecord)
+
+                // Record Unified Activity History
+                activityRepository?.recordActivity(
+                    userId = userId,
+                    activityType = ActivityType.REDEMPTION_REQUESTED,
+                    category = ActivityCategory.REDEMPTIONS,
+                    title = "🎁 Redemption",
+                    description = "₹${reward.value} ${reward.name} requested",
+                    relatedId = redemptionRecord.redemptionId,
+                    result = "Requested"
+                )
+
+                // Emit in-app notification & notification record
+                notificationService?.emitRedemptionStatus(
+                    userId = userId,
+                    rewardTitle = reward.name,
+                    statusText = "being verified",
+                    redemptionId = redemptionRecord.redemptionId
+                )
 
                 RedemptionResult.Success(
                     request = redemptionRecord,
@@ -293,6 +377,24 @@ class RedemptionRepository(
                     processedAt = System.currentTimeMillis()
                 )
                 redemptionDao.updateRequest(updatedRequest)
+
+                activityRepository?.recordActivity(
+                    userId = request.userId,
+                    activityType = ActivityType.REDEMPTION_REFUNDED,
+                    category = ActivityCategory.REDEMPTIONS,
+                    title = "🎁 Redemption Refunded",
+                    description = "Refunded ${request.rewardNameSnapshot}: $reason",
+                    relatedId = request.redemptionId,
+                    result = "+${request.requiredCoinsSnapshot} NestCoins"
+                )
+
+                notificationService?.emitRedemptionStatus(
+                    userId = request.userId,
+                    rewardTitle = request.rewardNameSnapshot,
+                    statusText = "refunded (+${request.requiredCoinsSnapshot} NestCoins returned)",
+                    redemptionId = request.redemptionId
+                )
+
                 Result.success(updatedRequest)
             }
             is TransactionResult.Duplicate -> {

@@ -36,9 +36,47 @@ class AppContainer(private val context: Context) {
     val gamePlayStatsDao by lazy { database.gamePlayStatsDao() }
     val dailyStreakDao by lazy { database.dailyStreakDao() }
     val referralDao by lazy { database.referralDao() }
+    val notificationDao by lazy { database.notificationDao() }
+    val activityDao by lazy { database.activityDao() }
+    val securityEventDao by lazy { database.securityEventDao() }
+
+    val securityEventLogger: com.example.core.security.SecurityEventLogger by lazy {
+        com.example.core.security.SecurityEventLogger(securityEventDao)
+    }
+
+    val fraudRiskEngine: com.example.core.security.FraudRiskEngine by lazy {
+        com.example.core.security.FraudRiskEngine(securityEventDao, securityEventLogger)
+    }
 
     val sessionManager by lazy {
         AuthSessionManager(context.applicationContext)
+    }
+
+    val notificationPreferencesRepository: com.example.data.repository.NotificationPreferencesRepository by lazy {
+        com.example.data.repository.NotificationPreferencesRepository(context.applicationContext)
+    }
+
+    val pushTokenManager: com.example.services.notifications.PushTokenManager by lazy {
+        com.example.services.notifications.PushTokenManager(context.applicationContext)
+    }
+
+    val notificationRepository: com.example.data.repository.NotificationRepository by lazy {
+        com.example.data.repository.NotificationRepository(
+            notificationDao = notificationDao,
+            preferencesRepository = notificationPreferencesRepository,
+            pushTokenManager = pushTokenManager
+        )
+    }
+
+    val activityRepository: com.example.data.repository.ActivityRepository by lazy {
+        com.example.data.repository.ActivityRepository(activityDao)
+    }
+
+    val notificationService: NotificationService by lazy {
+        NotificationService(
+            notificationRepository = notificationRepository,
+            activityRepository = activityRepository
+        )
     }
 
     val authRepository: AuthRepository by lazy {
@@ -66,11 +104,16 @@ class AppContainer(private val context: Context) {
     }
 
     val redemptionRepository: RedemptionRepository by lazy {
-        RedemptionRepository(redemptionDao, walletRepository, userRepository, database)
-    }
-
-    val notificationService: NotificationService by lazy {
-        NotificationService()
+        RedemptionRepository(
+            redemptionDao = redemptionDao,
+            walletRepository = walletRepository,
+            userRepository = userRepository,
+            database = database,
+            activityRepository = activityRepository,
+            notificationService = notificationService,
+            securityEventLogger = securityEventLogger,
+            fraudRiskEngine = fraudRiskEngine
+        )
     }
 
     val referralRiskEngine: com.example.domain.engine.ReferralRiskEngine by lazy {
@@ -96,13 +139,28 @@ class AppContainer(private val context: Context) {
     }
 
     val rewardEngine: RewardEngine by lazy {
-        RewardEngine(walletRepository, gameRepository, userRepository).apply {
+        RewardEngine(
+            walletRepository = walletRepository,
+            gameRepository = gameRepository,
+            userRepository = userRepository,
+            activityRepository = activityRepository,
+            notificationService = notificationService,
+            securityEventLogger = securityEventLogger,
+            fraudRiskEngine = fraudRiskEngine
+        ).apply {
             this.referralQualificationEngine = this@AppContainer.referralQualificationEngine
         }
     }
 
     val earnRepository: EarnRepository by lazy {
-        EarnRepository(walletRepository, userRepository, rewardEngine, dailyStreakDao)
+        EarnRepository(
+            walletRepository = walletRepository,
+            userRepository = userRepository,
+            rewardEngine = rewardEngine,
+            dailyStreakDao = dailyStreakDao,
+            activityRepository = activityRepository,
+            notificationService = notificationService
+        )
     }
 
     val gameEngine: GameEngine by lazy {
